@@ -52,6 +52,3 @@ https://github.com/MananBagga/Flextraff-Admin-Panel
 - API documentation will be available at `/docs` when the server is running
 - Additional documentation can be found in the `docs/` directory
 
-## License
-
-[Add your license information here]
