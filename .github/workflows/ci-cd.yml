@@ -39,13 +39,11 @@ jobs:
 
     - name: ⚡ Run Fast Tests Only
       run: |
-        # Run only unit and algorithm tests (exclude slow, integration, performance, database)
-        pytest -v \
-          -m "unit or algorithm" \
-          --tb=short \
-          --maxfail=5 \
-          --durations=10 \
-          tests/
+              - name: Run fast tests
+        run: |
+          # Run only essential unit tests for quick feedback
+          # Exclude integration tests, performance tests, and database tests
+          python -m pytest tests/test_traffic_algorithm.py tests/test_api_endpoints.py -v --tb=short --maxfail=5 --durations=10 --disable-warnings
 
     - name: 📊 Generate Test Report
       if: always()

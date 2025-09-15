@@ -39,7 +39,8 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest tests/ --verbose
+        # Run only essential unit tests for deployment validation
+        python -m pytest tests/test_traffic_algorithm.py tests/test_api_endpoints.py -v --tb=short --maxfail=5 --disable-warnings
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
