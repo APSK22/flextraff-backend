@@ -393,6 +393,7 @@ curl -X POST "http://127.0.0.1:8001/calculate-timing" \
 ```
 
 ## 🔮 Future Enhancements
+
 - [ ]Computer Vision for vehicle type like bike,autorickshaw
 - [ ] Machine Learning integration for prediction
 - [ ] Weather condition adjustments
