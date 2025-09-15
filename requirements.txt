@@ -40,3 +40,7 @@ redis==5.2.0
 # Testing (for development)
 pytest==8.3.3
 pytest-asyncio==0.24.0
+pytest-timeout==2.3.1
+
+# Development dependencies (already included above)
+# python-dotenv==1.0.1

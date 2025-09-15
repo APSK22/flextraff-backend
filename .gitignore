@@ -148,3 +148,7 @@ logs/
 # Temporary files
 tmp/
 temp/
+docs/PROJECT_SETUP.md
+docs/CI_CD_SETUP.md
+docs/RENDER_DEPLOYMENT.md
+.gitignore
