@@ -268,6 +268,22 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ## 🔧 Development
 
+### Code Quality & Linting
+
+**🔍 Before pushing to any branch, ensure your code passes linting:**
+
+```bash
+# Quick linting check
+./scripts/pre-push-lint.sh
+
+# Or install pre-commit for automatic checks
+pip install pre-commit
+pre-commit install
+```
+
+**📋 Linting runs automatically on all branches via GitHub Actions**
+- See [Linting Guidelines](docs/LINTING_GUIDELINES.md) for detailed setup
+
 ### Running the Application
 
 1. **Start the API server:**

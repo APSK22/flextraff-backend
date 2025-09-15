@@ -49,7 +49,7 @@ jobs:
       if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'linting'
       run: |
         echo "🔍 Running flake8 linting..."
-        flake8 app/ tests/ main.py --max-line-length=88 --extend-ignore=E203,W503 || echo "❌ Linting issues found"
+        flake8 app/ tests/ main.py --statistics || echo "❌ Linting issues found"
 
     - name: 🏷️ Type Check (mypy)
       if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'type-check'
@@ -70,5 +70,5 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Check linting:" >> $GITHUB_STEP_SUMMARY
         echo '```bash' >> $GITHUB_STEP_SUMMARY
-        echo "flake8 app/ tests/ main.py --max-line-length=88 --extend-ignore=E203,W503" >> $GITHUB_STEP_SUMMARY
+        echo "flake8 app/ tests/ main.py --statistics" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY

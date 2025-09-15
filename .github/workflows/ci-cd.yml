@@ -1,4 +1,4 @@
-name: 🚀 CI/CD Pipeline - FlexTraff Backend
+name: 🚀 CI/CD Pipeline - FlexTraff Backend (Main Branches)
 
 on:
   push:

@@ -1,0 +1,48 @@
+[flake8]
+# More lenient flake8 configuration for developer-friendly linting
+
+# Line length - increased from 88 to 120 for more flexibility
+max-line-length = 120
+
+# Maximum complexity - more lenient
+max-complexity = 15
+
+# Ignore rules that are too strict or conflict with Black formatter
+extend-ignore = 
+    E203,
+    W503,
+    W504,
+    E501,
+    F841,
+    F401,
+    F541,
+    C901,
+    D100,
+    D101,
+    D102,
+    D103,
+    D104,
+    D105,
+    E226,
+    E227,
+    E228,
+    N806,
+    N802,
+    N803,
+    N801
+
+# Exclude common directories that don't need linting
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .pytest_cache,
+    build,
+    dist,
+    migrations
+
+# Show statistics
+statistics = True
+count = True

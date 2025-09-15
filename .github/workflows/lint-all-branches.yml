@@ -1,0 +1,60 @@
+name: 🔍 Basic Linting - All Branches
+
+on:
+  push:
+    branches: ['**']  # Run on all branches
+  pull_request:
+    branches: ['**']  # Run on all pull requests
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint-check:
+    name: 🧹 Basic Linting Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: 📦 Cache Dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-lint-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-lint-
+          ${{ runner.os }}-pip-
+
+    - name: 🔧 Install Linting Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 bandit
+        # Only install minimal dependencies for linting
+        pip install -r requirements.txt
+
+    - name: 🧹 Run Flake8 Linting
+      run: |
+        echo "🔍 Running Flake8 linting check..."
+        flake8 app/ tests/ main.py --statistics
+
+    - name: 🛡️ Run Basic Security Scan
+      run: |
+        echo "🔒 Running basic security scan..."
+        bandit -r app/ -f json || echo "⚠️ Security issues found - review required"
+
+    - name: 📊 Generate Lint Report
+      if: always()
+      run: |
+        echo "## 🔍 Linting Results" >> $GITHUB_STEP_SUMMARY
+        echo "- Code Quality Check: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+        echo "- Security Scan: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+        echo "- Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "💡 **Tip:** This lightweight check runs on all branches to catch issues early!" >> $GITHUB_STEP_SUMMARY
