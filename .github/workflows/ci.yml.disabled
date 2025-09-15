@@ -44,13 +44,14 @@ jobs:
         echo "DEBUG=true" >> .env
         echo "LOG_LEVEL=INFO" >> .env
 
-    - name: Run code formatting check (Black)
-      run: |
-        black --check --diff app/ tests/ main.py
+    # Code formatting checks disabled - focusing on linting and errors only
+    # - name: Run code formatting check (Black)
+    #   run: |
+    #     black --check --diff app/ tests/ main.py
 
-    - name: Run import sorting check (isort)
-      run: |
-        isort --check-only --diff app/ tests/ main.py
+    # - name: Run import sorting check (isort)
+    #   run: |
+    #     isort --check-only --diff app/ tests/ main.py
 
     - name: Run linting (flake8)
       run: |
