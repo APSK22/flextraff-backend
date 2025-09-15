@@ -30,14 +30,8 @@ jobs:
         # Run only essential unit tests for deployment validation
         python -m pytest tests/test_traffic_algorithm.py tests/test_api_endpoints.py -v --tb=short --maxfail=5 --disable-warnings
 
-    - name: Validate production health
+    - name: Deployment readiness
       run: |
         echo "✅ Tests passed - Ready for deployment"
-        echo "Checking current production status..."
-        curl -f https://flextraff-backend.onrender.com/health || echo "⚠️ Production health check failed"
-        
-    - name: Deployment notification
-      run: |
-        echo "🚀 Deployment validation complete!"
         echo "📝 Render will auto-deploy from main branch"
         echo "🌐 Production URL: https://flextraff-backend.onrender.com/"

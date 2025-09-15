@@ -99,19 +99,20 @@ jobs:
         echo "⏳ Waiting for Render to complete deployment..."
         sleep 30
 
-    - name: 🏥 Health Check
-      run: |
-        echo "🏥 Performing health check..."
-        # Replace with your actual Render URL
-        for i in {1..10}; do
-          if curl -f "${{ secrets.RENDER_APP_URL }}/health" 2>/dev/null; then
-            echo "✅ Health check passed!"
-            break
-          else
-            echo "⏳ Attempt $i failed, retrying in 10 seconds..."
-            sleep 10
-          fi
-        done
+    # Health check removed - unnecessary retries and delays
+    # - name: 🏥 Health Check
+    #   run: |
+    #     echo "🏥 Performing health check..."
+    #     # Replace with your actual Render URL
+    #     for i in {1..10}; do
+    #       if curl -f "${{ secrets.RENDER_APP_URL }}/health" 2>/dev/null; then
+    #         echo "✅ Health check passed!"
+    #         break
+    #       else
+    #         echo "⏳ Attempt $i failed, retrying in 10 seconds..."
+    #         sleep 10
+    #       fi
+    #     done
 
     - name: 📝 Deployment Summary
       run: |
