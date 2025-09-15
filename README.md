@@ -4,6 +4,14 @@
 [![Python](https://img.shields.io/badge/Python-3.13.5-blue.svg)](https://python.org)
 [![Supabase](https://img.shields.io/badge/Database-Supabase-green.svg)](https://supabase.com)
 [![Tests](https://img.shields.io/badge/Tests-64%20passing-brightgreen.svg)](#testing)
+[![Deployment](https://img.shields.io/badge/Deploy-Live%20on%20Render-brightgreen.svg)](https://flextraff-backend.onrender.com/)
+
+## 🌐 Live Demo
+
+**Production API:** [https://flextraff-backend.onrender.com/](https://flextraff-backend.onrender.com/)
+- **Health Check:** [/health](https://flextraff-backend.onrender.com/health)
+- **Interactive Docs:** [/docs](https://flextraff-backend.onrender.com/docs)
+- **OpenAPI Schema:** [/openapi.json](https://flextraff-backend.onrender.com/openapi.json)
 
 ## 🚦 Overview
 
