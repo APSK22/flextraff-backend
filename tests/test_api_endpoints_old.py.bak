@@ -1,0 +1,509 @@
+"""
+Unit tests for individual API endpoints
+Tests each endpoint in isolation with mocked dependencies
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+import json
+from datetime import date
+
+from tests.conftest import TestData, assert_response_schema, assert_valid_green_times, assert_valid_cycle_time
+
+
+class TestRootEndpoint:
+    """Test root endpoint (/)"""
+    
+    def test_root_endpoint_success(self, test_client: TestClient):
+        """Test root endpoint returns correct API information"""
+        response = test_client.get("/")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response structure
+        expected_keys = ["service", "version", "description", "docs", "health"]
+        for key in expected_keys:
+            assert key in data
+        
+        # Verify specific values
+        assert data["service"] == "FlexTraff ATCS API"
+        assert data["version"] == "1.0.0"
+        assert data["docs"] == "/docs"
+        assert data["health"] == "/health"
+
+
+class TestHealthEndpoint:
+    """Test health check endpoint (/health)"""
+    
+    def test_health_check_healthy(self, test_client: TestClient):
+        """Test health check when database is connected"""        
+        response = test_client.get("/health")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response schema
+        assert_response_schema(data, TestData.HEALTH_RESPONSE_SCHEMA)
+        
+        # Verify healthy status
+        assert data["status"] == "healthy"
+        assert data["database_connected"] is True
+        assert data["algorithm_version"] == "ATCS v1.0"
+        assert "error" not in data or data["error"] is None
+    
+    @patch('main.db_service')
+    def test_health_check_unhealthy(self, mock_db, test_client: TestClient):
+        """Test health check when database is disconnected"""
+        # Mock unhealthy database
+        mock_db.health_check.return_value = {
+            "database_connected": False,
+            "error": "Connection timeout"
+        }
+        
+        response = test_client.get("/health")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify unhealthy status
+        assert data["status"] == "unhealthy"
+        assert data["database_connected"] is False
+        assert data["error"] == "Connection timeout"
+    
+    @patch('main.db_service')
+    def test_health_check_exception(self, mock_db, test_client: TestClient):
+        """Test health check when exception occurs"""
+        # Mock exception
+        mock_db.health_check.side_effect = Exception("Database error")
+        
+        response = test_client.get("/health")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify error handling
+        assert data["status"] == "error"
+        assert data["database_connected"] is False
+        assert "Database error" in data["error"]
+
+
+class TestTrafficCalculationEndpoint:
+    """Test traffic calculation endpoint (/calculate-timing)"""
+    
+    @patch('main.traffic_calculator')
+    def test_calculate_timing_success(self, mock_calc, test_client: TestClient):
+        """Test successful traffic timing calculation"""
+        # Mock calculator response
+        mock_calc.calculate_green_times.return_value = ([30, 25, 35, 30], 120)
+        mock_calc.get_algorithm_info.return_value = {
+            "algorithm": "ATCS",
+            "version": "1.0",
+            "total_vehicles": 100
+        }
+        
+        # Test with valid data
+        request_data = {
+            "lane_counts": TestData.RUSH_HOUR_LANES,
+            "junction_id": 1
+        }
+        
+        response = test_client.post("/calculate-timing", json=request_data)
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response schema
+        assert_response_schema(data, TestData.TRAFFIC_CALCULATION_RESPONSE_SCHEMA)
+        
+        # Verify calculation results
+        assert_valid_green_times(data["green_times"])
+        assert_valid_cycle_time(data["cycle_time"])
+        assert data["junction_id"] == 1
+        
+        # Verify calculator was called correctly
+        mock_calc.calculate_green_times.assert_called_once_with(
+            TestData.RUSH_HOUR_LANES, junction_id=1
+        )
+    
+    def test_calculate_timing_without_junction_id(self, test_client: TestClient):
+        """Test calculation without junction ID"""
+        with patch('main.traffic_calculator') as mock_calc:
+            mock_calc.calculate_green_times.return_value = ([30, 25, 35, 30], 120)
+            mock_calc.get_algorithm_info.return_value = {"algorithm": "ATCS"}
+            
+            request_data = {"lane_counts": TestData.NORMAL_TRAFFIC_LANES}
+            
+            response = test_client.post("/calculate-timing", json=request_data)
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["junction_id"] is None
+    
+    @pytest.mark.parametrize("invalid_lanes", TestData.INVALID_LANE_COUNTS)
+    def test_calculate_timing_invalid_lanes(self, invalid_lanes, test_client: TestClient):
+        """Test calculation with invalid lane counts"""
+        request_data = {"lane_counts": invalid_lanes}
+        
+        response = test_client.post("/calculate-timing", json=request_data)
+        
+        # Should return validation error
+        assert response.status_code == 422
+    
+    @patch('main.traffic_calculator')
+    def test_calculate_timing_calculation_error(self, mock_calc, test_client: TestClient):
+        """Test calculation when algorithm raises exception"""
+        # Mock calculation error
+        mock_calc.calculate_green_times.side_effect = Exception("Calculation failed")
+        
+        request_data = {"lane_counts": TestData.RUSH_HOUR_LANES}
+        
+        response = test_client.post("/calculate-timing", json=request_data)
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "Calculation failed" in data["detail"]
+
+
+class TestVehicleDetectionEndpoint:
+    """Test vehicle detection endpoint (/vehicle-detection)"""
+    
+    @patch('main.db_service')
+    def test_log_vehicle_detection_success(self, mock_db, test_client: TestClient):
+        """Test successful vehicle detection logging"""
+        # Mock database response
+        mock_db.log_vehicle_detection.return_value = {"id": 1, "status": "logged"}
+        
+        # Test with valid detection data
+        detection_data = TestData.VALID_VEHICLE_DETECTIONS[0]
+        
+        response = test_client.post("/vehicle-detection", json=detection_data)
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response
+        assert data["status"] == "success"
+        assert data["message"] == "Vehicle detection logged"
+        assert data["junction_id"] == detection_data["junction_id"]
+        assert data["lane"] == detection_data["lane_number"]
+        assert data["fastag_id"] == detection_data["fastag_id"]
+    
+    @pytest.mark.parametrize("detection_data", TestData.VALID_VEHICLE_DETECTIONS)
+    def test_log_vehicle_detection_all_valid(self, detection_data, test_client: TestClient):
+        """Test logging with all valid vehicle detection samples"""
+        with patch('main.db_service') as mock_db:
+            mock_db.log_vehicle_detection.return_value = {"id": 1}
+            
+            response = test_client.post("/vehicle-detection", json=detection_data)
+            
+            assert response.status_code == 200
+    
+    @pytest.mark.parametrize("invalid_data", TestData.INVALID_VEHICLE_DETECTIONS)
+    def test_log_vehicle_detection_invalid(self, invalid_data, test_client: TestClient):
+        """Test logging with invalid vehicle detection data"""
+        response = test_client.post("/vehicle-detection", json=invalid_data)
+        
+        # Should return validation error
+        assert response.status_code == 422
+    
+    @patch('main.db_service')
+    def test_log_vehicle_detection_database_error(self, mock_db, test_client: TestClient):
+        """Test vehicle detection logging when database error occurs"""
+        # Mock database error
+        mock_db.log_vehicle_detection.side_effect = Exception("Database error")
+        
+        detection_data = TestData.VALID_VEHICLE_DETECTIONS[0]
+        
+        response = test_client.post("/vehicle-detection", json=detection_data)
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "Database error" in data["detail"]
+
+
+class TestJunctionsEndpoint:
+    """Test junctions endpoint (/junctions)"""
+    
+    @patch('main.db_service')
+    def test_get_junctions_success(self, mock_db, test_client: TestClient):
+        """Test successful retrieval of junctions"""
+        # Mock junctions data
+        mock_junctions = [
+            {"id": 1, "junction_name": "Central Square", "status": "active"},
+            {"id": 2, "junction_name": "Main Street", "status": "active"},
+            {"id": 3, "junction_name": "Park Avenue", "status": "active"}
+        ]
+        mock_db.get_all_junctions.return_value = mock_junctions
+        
+        response = test_client.get("/junctions")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response structure
+        assert "junctions" in data
+        assert len(data["junctions"]) == 3
+        
+        # Verify junction data
+        for junction in data["junctions"]:
+            assert "id" in junction
+            assert "junction_name" in junction
+            assert "status" in junction
+    
+    @patch('main.db_service')
+    def test_get_junctions_empty(self, mock_db, test_client: TestClient):
+        """Test retrieval when no junctions exist"""
+        mock_db.get_all_junctions.return_value = []
+        
+        response = test_client.get("/junctions")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["junctions"] == []
+    
+    @patch('main.db_service')
+    def test_get_junctions_database_error(self, mock_db, test_client: TestClient):
+        """Test junctions endpoint when database error occurs"""
+        mock_db.get_all_junctions.side_effect = Exception("Database error")
+        
+        response = test_client.get("/junctions")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "Database error" in data["detail"]
+
+
+class TestJunctionStatusEndpoint:
+    """Test junction status endpoint (/junction/{id}/status)"""
+    
+    @patch('main.db_service')
+    def test_get_junction_status_success(self, mock_db, test_client: TestClient):
+        """Test successful junction status retrieval"""
+        junction_id = 1
+        
+        # Mock database responses
+        mock_db.get_current_lane_counts.return_value = [
+            {"lane": "North", "lane_number": 1, "count": 10},
+            {"lane": "South", "lane_number": 2, "count": 8},
+            {"lane": "East", "lane_number": 3, "count": 12},
+            {"lane": "West", "lane_number": 4, "count": 6}
+        ]
+        mock_db.get_current_traffic_cycle.return_value = {
+            "total_cycle_time": 120,
+            "total_vehicles_detected": 36
+        }
+        mock_db.get_vehicles_count_by_date.return_value = 150
+        mock_db.get_all_junctions.return_value = [
+            {"id": 1, "junction_name": "Test Junction"}
+        ]
+        
+        response = test_client.get(f"/junction/{junction_id}/status")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response schema
+        assert_response_schema(data, TestData.JUNCTION_STATUS_RESPONSE_SCHEMA)
+        
+        # Verify specific data
+        assert data["junction_id"] == junction_id
+        assert data["junction_name"] == "Test Junction"
+        assert len(data["current_lane_counts"]) == 4
+        assert data["total_vehicles_today"] == 150
+    
+    @patch('main.db_service')
+    def test_get_junction_status_not_found(self, mock_db, test_client: TestClient):
+        """Test junction status for non-existent junction"""
+        mock_db.get_all_junctions.return_value = []  # No junctions
+        
+        response = test_client.get("/junction/999/status")
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert "Junction not found" in data["detail"]
+    
+    @pytest.mark.parametrize("junction_id", TestData.VALID_JUNCTION_IDS)
+    def test_get_junction_status_all_valid_ids(self, junction_id, test_client: TestClient):
+        """Test junction status with all valid junction IDs"""
+        with patch('main.db_service') as mock_db:
+            # Mock responses for any valid junction
+            mock_db.get_current_lane_counts.return_value = []
+            mock_db.get_current_traffic_cycle.return_value = None
+            mock_db.get_vehicles_count_by_date.return_value = 0
+            mock_db.get_all_junctions.return_value = [
+                {"id": junction_id, "junction_name": f"Junction {junction_id}"}
+            ]
+            
+            response = test_client.get(f"/junction/{junction_id}/status")
+            
+            assert response.status_code == 200
+
+
+class TestLiveTimingEndpoint:
+    """Test live timing endpoint (/junction/{id}/live-timing)"""
+    
+    @patch('main.traffic_calculator')
+    @patch('main.db_service')
+    def test_get_live_timing_success(self, mock_db, mock_calc, test_client: TestClient):
+        """Test successful live timing retrieval"""
+        junction_id = 1
+        
+        # Mock database response
+        mock_db.get_current_lane_counts.return_value = [
+            {"lane_number": 1, "count": 10},
+            {"lane_number": 2, "count": 8},
+            {"lane_number": 3, "count": 12},
+            {"lane_number": 4, "count": 6}
+        ]
+        
+        # Mock calculator response
+        mock_calc.calculate_green_times.return_value = ([25, 20, 30, 25], 100)
+        mock_calc.get_algorithm_info.return_value = {"algorithm": "ATCS"}
+        
+        response = test_client.get(f"/junction/{junction_id}/live-timing")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response structure
+        expected_keys = [
+            "junction_id", "current_lane_counts", "recommended_green_times",
+            "total_cycle_time", "time_window_minutes", "algorithm_info"
+        ]
+        for key in expected_keys:
+            assert key in data
+        
+        # Verify data
+        assert data["junction_id"] == junction_id
+        assert len(data["current_lane_counts"]) == 4
+        assert_valid_green_times(data["recommended_green_times"])
+        assert_valid_cycle_time(data["total_cycle_time"])
+    
+    @patch('main.db_service')
+    def test_get_live_timing_with_time_window(self, mock_db, test_client: TestClient):
+        """Test live timing with custom time window"""
+        mock_db.get_current_lane_counts.return_value = []
+        
+        with patch('main.traffic_calculator') as mock_calc:
+            mock_calc.calculate_green_times.return_value = ([15, 15, 15, 15], 60)
+            mock_calc.get_algorithm_info.return_value = {}
+            
+            response = test_client.get("/junction/1/live-timing?time_window=10")
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["time_window_minutes"] == 10
+            
+            # Verify database was called with correct time window
+            mock_db.get_current_lane_counts.assert_called_once_with(1, time_window_minutes=10)
+
+
+class TestJunctionHistoryEndpoint:
+    """Test junction history endpoint (/junction/{id}/history)"""
+    
+    @patch('main.db_service')
+    def test_get_junction_history_success(self, mock_db, test_client: TestClient):
+        """Test successful junction history retrieval"""
+        junction_id = 1
+        
+        # Mock database responses
+        mock_detections = [
+            {"id": 1, "fastag_id": "TEST123", "detection_timestamp": "2025-09-15T12:00:00"},
+            {"id": 2, "fastag_id": "TEST456", "detection_timestamp": "2025-09-15T12:01:00"}
+        ]
+        mock_cycle = {"total_cycle_time": 120, "total_vehicles_detected": 36}
+        
+        mock_db.get_recent_detections_with_signals.return_value = mock_detections
+        mock_db.get_current_traffic_cycle.return_value = mock_cycle
+        
+        response = test_client.get(f"/junction/{junction_id}/history")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response structure
+        expected_keys = ["junction_id", "recent_detections", "latest_cycle", "total_records"]
+        for key in expected_keys:
+            assert key in data
+        
+        # Verify data
+        assert data["junction_id"] == junction_id
+        assert len(data["recent_detections"]) == 2
+        assert data["total_records"] == 2
+        assert data["latest_cycle"] == mock_cycle
+    
+    @patch('main.db_service')
+    def test_get_junction_history_with_limit(self, mock_db, test_client: TestClient):
+        """Test junction history with custom limit"""
+        mock_db.get_recent_detections_with_signals.return_value = []
+        mock_db.get_current_traffic_cycle.return_value = None
+        
+        response = test_client.get("/junction/1/history?limit=5")
+        
+        assert response.status_code == 200
+        
+        # Verify database was called with correct limit
+        mock_db.get_recent_detections_with_signals.assert_called_once_with(1, limit=10)  # limit*2
+
+
+class TestDailySummaryEndpoint:
+    """Test daily summary endpoint (/analytics/daily-summary)"""
+    
+    @patch('main.db_service')
+    def test_get_daily_summary_success(self, mock_db, test_client: TestClient):
+        """Test successful daily summary retrieval"""
+        # Mock database responses
+        mock_junctions = [
+            {"id": 1, "junction_name": "Junction A"},
+            {"id": 2, "junction_name": "Junction B"}
+        ]
+        mock_db.get_all_junctions.return_value = mock_junctions
+        mock_db.get_vehicles_count_by_date.side_effect = [100, 75]  # Different counts for each junction
+        
+        response = test_client.get("/analytics/daily-summary")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response structure
+        expected_keys = ["date", "junction_summaries", "total_vehicles"]
+        for key in expected_keys:
+            assert key in data
+        
+        # Verify data
+        assert data["date"] == date.today().isoformat()
+        assert len(data["junction_summaries"]) == 2
+        assert data["total_vehicles"] == 175  # 100 + 75
+        
+        # Verify junction summaries
+        for summary in data["junction_summaries"]:
+            required_keys = ["junction_id", "junction_name", "total_vehicles", "date"]
+            for key in required_keys:
+                assert key in summary
+    
+    @patch('main.db_service')
+    def test_get_daily_summary_custom_date(self, mock_db, test_client: TestClient):
+        """Test daily summary with custom date"""
+        target_date = "2025-09-14"
+        
+        mock_db.get_all_junctions.return_value = [{"id": 1, "junction_name": "Test"}]
+        mock_db.get_vehicles_count_by_date.return_value = 50
+        
+        response = test_client.get(f"/analytics/daily-summary?target_date={target_date}")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["date"] == target_date
+    
+    @patch('main.db_service')
+    def test_get_daily_summary_no_junctions(self, mock_db, test_client: TestClient):
+        """Test daily summary when no junctions exist"""
+        mock_db.get_all_junctions.return_value = []
+        
+        response = test_client.get("/analytics/daily-summary")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["junction_summaries"] == []
+        assert data["total_vehicles"] == 0
