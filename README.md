@@ -25,7 +25,7 @@ FlexTraff Backend is an intelligent **Adaptive Traffic Control System (ATCS)** t
 - 🚀 **High Performance**: <100ms response times for calculations
 - 🧪 **Comprehensive Testing**: 64 tests across 7 categories
 - 📱 **RESTful APIs**: Easy integration with frontend applications
-- 🔒 **Secure**: JWT authentication and data validation
+- 🔒 **Secure**: JWT authentication and data validation using supabase
 
 ## 🚀 Quick Start
 
