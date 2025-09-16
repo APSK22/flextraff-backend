@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 FastAPI application for FlexTraff traffic management system
-Provides REST APIs for traffic calculation and data management
+Provides REST APIs for traffic calculation, data management
+and communication with IoT devices with MQTT for dynamic processing
+
 """
 
 import asyncio
