@@ -11,29 +11,29 @@ from datetime import datetime
 class TrafficCalculator:
     """
     ATCS Core Algorithm - Adaptive Traffic Light Timing Calculator
-    
+
     Implements intelligent traffic timing calculation algorithm that
     dynamically adjusts green light durations based on real-time vehicle counts.
     Now includes yellow light phase (5 seconds per lane).
     """
-    
+
     # Yellow light configuration (constant)
     YELLOW_LIGHT_TIME = 5  # Fixed 5 seconds per lane
-    
+
     def __init__(self, min_time: int = 15, max_time: int = 90, base_cycle_time: int = 120):
         self.min_time = min_time
         self.max_time = max_time
         self.base_cycle_time = base_cycle_time
         self.logger = logging.getLogger(__name__)
-    
+
     async def calculate_green_times(
-        self, 
-        lane_counts: List[int], 
+        self,
+        lane_counts: List[int],
         junction_id: int = None
     ) -> Tuple[List[int], int]:
         """
         Calculate optimal green times for each lane based on vehicle counts
-        
+
         Algorithm Logic:
         1. Count total vehicles across all 4 lanes
         2. Calculate yellow light time: 4 lanes × 5 seconds = 20 seconds total
@@ -43,33 +43,33 @@ class TrafficCalculator:
         6. Cap at 90s max per lane with redistribution
         7. Round to whole seconds and balance total
         8. Total cycle time = green times + yellow times
-        
+
         Args:
             lane_counts (List[int]): Vehicle count [lane1, lane2, lane3, lane4]
             junction_id (int, optional): Junction ID for logging
-            
+
         Returns:
             Tuple[List[int], int]: (green_times_per_lane, total_cycle_time_including_yellow)
         """
         start_time = datetime.now()
-        
+
         if len(lane_counts) != 4:
             raise ValueError("Lane counts must contain exactly 4 values")
-        
+
         if any(count < 0 for count in lane_counts):
             raise ValueError("Lane counts cannot be negative")
-            
+
         num_lanes = 4
         total_cars = sum(lane_counts)
-        
+
         # Calculate yellow light overhead (5 seconds per lane)
         total_yellow_time = num_lanes * self.YELLOW_LIGHT_TIME
-        
+
         self.logger.info(
             f"Calculating green times for lane counts: {lane_counts}, "
             f"total vehicles: {total_cars}, yellow time overhead: {total_yellow_time}s"
         )
-        
+
         # Step 1: Calculate base cycle time (for green phases only)
         if total_cars <= 100:
             green_cycle_time = self.base_cycle_time
@@ -77,13 +77,13 @@ class TrafficCalculator:
             increments = (total_cars - 100) // 10
             green_cycle_time = self.base_cycle_time + increments * 10
             green_cycle_time = min(green_cycle_time, 180)
-        
+
         # Step 2: Initial green time allocation
         rem_time = green_cycle_time - self.min_time * num_lanes
         green_times_raw = []
         fixed_lanes = []
         adjustable_lanes = []
-        
+
         for idx, count in enumerate(lane_counts):
             if count <= self.min_time:
                 green_times_raw.append(self.min_time)
@@ -92,17 +92,17 @@ class TrafficCalculator:
                 green_time = self.min_time + ((count - self.min_time) / total_cars) * rem_time
                 green_times_raw.append(green_time)
                 adjustable_lanes.append(idx)
-        
+
         # Step 3: Proportional allocation for adjustable lanes
         fixed_sum = sum(green_times_raw[i] for i in fixed_lanes)
         adjustable_cycle_time = green_cycle_time - fixed_sum
         adjustable_raw_sum = sum(green_times_raw[i] for i in adjustable_lanes)
-        
+
         green_times = green_times_raw.copy()
         if adjustable_raw_sum > 0:
             for i in adjustable_lanes:
                 green_times[i] = (green_times_raw[i] / adjustable_raw_sum) * adjustable_cycle_time
-        
+
         # Step 4: Enforce maximum time with redistribution
         while True:
             excess_time = 0
@@ -113,25 +113,25 @@ class TrafficCalculator:
                     green_times[i] = self.max_time
                 else:
                     under_max_lanes.append(i)
-            
+
             if excess_time > 0 and under_max_lanes:
                 distribute_per_lane = excess_time / len(under_max_lanes)
                 for i in under_max_lanes:
                     green_times[i] += distribute_per_lane
             else:
                 break
-        
+
         # Step 5: Final rounding and balancing (green times only)
         green_times_rounded = [round(t) for t in green_times]
         diff = green_cycle_time - sum(green_times_rounded)
         green_times_rounded[-1] += diff
-        
+
         # Step 6: Calculate total cycle time (green + yellow)
         total_cycle_time = green_cycle_time + total_yellow_time
-        
+
         # Calculate execution time
         execution_time = (datetime.now() - start_time).total_seconds() * 1000
-        
+
         self.logger.info(
             f"Calculated green times: {green_times_rounded}, "
             f"green cycle time: {green_cycle_time}s, "
@@ -139,26 +139,26 @@ class TrafficCalculator:
             f"total cycle time: {total_cycle_time}s, "
             f"execution time: {execution_time:.2f}ms"
         )
-        
+
         return green_times_rounded, total_cycle_time
 
     def get_yellow_times(self) -> List[int]:
         """
         Get yellow light times for all lanes
-        
+
         Returns:
             List[int]: Yellow times for each lane [5, 5, 5, 5]
         """
         return [self.YELLOW_LIGHT_TIME] * 4
 
     def get_full_cycle_breakdown(
-        self, 
-        lane_counts: List[int], 
+        self,
+        lane_counts: List[int],
         junction_id: int = None
     ) -> dict:
         """
         Get detailed breakdown of traffic light cycle including green and yellow phases
-        
+
         Returns:
             dict: Complete cycle breakdown with green times, yellow times, and totals
         """
@@ -166,17 +166,17 @@ class TrafficCalculator:
         raise NotImplementedError("Use async version: get_full_cycle_breakdown_async")
 
     async def get_full_cycle_breakdown_async(
-        self, 
-        lane_counts: List[int], 
+        self,
+        lane_counts: List[int],
         junction_id: int = None
     ) -> dict:
         """
         Get detailed breakdown of traffic light cycle including green and yellow phases
-        
+
         Args:
             lane_counts (List[int]): Vehicle count per lane
             junction_id (int, optional): Junction ID for logging
-            
+
         Returns:
             dict: Complete cycle breakdown with green times, yellow times, and totals
         """
@@ -185,7 +185,7 @@ class TrafficCalculator:
         )
         yellow_times = self.get_yellow_times()
         green_cycle_time = total_cycle_time - sum(yellow_times)
-        
+
         return {
             "lane_counts": lane_counts,
             "green_times": green_times,
@@ -206,47 +206,47 @@ class TrafficCalculator:
         }
 
     def validate_calculation(
-        self, 
-        lane_counts: List[int], 
-        green_times: List[int], 
+        self,
+        lane_counts: List[int],
+        green_times: List[int],
         cycle_time: int
     ) -> bool:
         """
         Validate that calculated times meet all constraints
-        
+
         Args:
             lane_counts (List[int]): Vehicle counts per lane
             green_times (List[int]): Calculated green times per lane
             cycle_time (int): Total cycle time (green + yellow)
-            
+
         Returns:
             bool: True if all constraints are met
         """
         # Check bounds
         if any(time < self.min_time or time > self.max_time for time in green_times):
             return False
-        
+
         # Calculate expected green cycle time (cycle_time - yellow_time)
         total_yellow = len(lane_counts) * self.YELLOW_LIGHT_TIME
         green_cycle_time = cycle_time - total_yellow
-        
+
         # Check green times sum equals green cycle time
         if sum(green_times) != green_cycle_time:
             return False
-            
+
         # Check proportionality (allow 2s rounding difference)
         for i in range(len(lane_counts)):
             for j in range(i + 1, len(lane_counts)):
                 if lane_counts[i] > lane_counts[j] and green_times[i] < green_times[j]:
                     if green_times[j] - green_times[i] > 2:
                         return False
-        
+
         return True
 
     def get_algorithm_info(self) -> dict:
         """
         Get algorithm metadata and configuration
-        
+
         Returns:
             dict: Algorithm information including version and parameters
         """
