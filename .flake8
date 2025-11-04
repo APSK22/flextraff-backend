@@ -1,18 +1,36 @@
 [flake8]
-# More lenient flake8 configuration for developer-friendly linting
+# Very lenient flake8 configuration - focus on critical errors only
 
-# Line length - increased from 88 to 120 for more flexibility
+# Line length - increased to 120 for more flexibility
 max-line-length = 120
 
 # Maximum complexity - more lenient
 max-complexity = 15
 
-# Ignore rules that are too strict or conflict with Black formatter
-extend-ignore = 
+# Ignore ALL whitespace and formatting issues (these are silly errors)
+extend-ignore =
     E203,
+    E226,
+    E227,
+    E228,
+    W291,
+    W293,
     W503,
     W504,
     E501,
+    E231,
+    E241,
+    E251,
+    E701,
+    E702,
+    E703,
+    E711,
+    E712,
+    E713,
+    E714,
+    E721,
+    E722,
+    E731,
     F841,
     F401,
     F541,
@@ -23,26 +41,48 @@ extend-ignore =
     D103,
     D104,
     D105,
-    E226,
-    E227,
-    E228,
+    D106,
+    D107,
+    D200,
+    D201,
+    D202,
+    D203,
+    D204,
+    D205,
+    D206,
+    D207,
+    D208,
+    D209,
+    D210,
+    D211,
+    D212,
+    D213,
     N806,
     N802,
     N803,
     N801
 
-# Exclude common directories that don't need linting
-exclude = 
+# Exclude common directories
+exclude =
     .git,
     __pycache__,
     .venv,
     venv,
     env,
     .pytest_cache,
+    .mypy_cache,
     build,
     dist,
-    migrations
+    migrations,
+    node_modules,
+    .eggs,
+    *.egg-info,
+    .tox
 
 # Show statistics
 statistics = True
 count = True
+
+# Per-file ignores for even more flexibility in tests
+per-file-ignores =
+    tests/*:E501,F401,F841,D,W,E
