@@ -265,3 +265,103 @@ class TrafficCalculator:
                 "Ensures proportional allocation while respecting min/max constraints."
             ),
         }
+
+    def get_fallback_times(self) -> Tuple[List[int], int]:
+        """
+        Get fallback/offline mode timing when internet/vehicle detection is unavailable.
+        Uses maximum cycle time with equal distribution across all lanes.
+
+        This is used when:
+        - Raspberry Pi loses internet connection
+        - Vehicle detection system is offline
+        - Communication with backend server fails
+
+        Returns:
+            Tuple[List[int], int]: (green_times_per_lane, total_cycle_time_with_yellow)
+        """
+        # Each lane gets maximum green time (90s) for safe traffic flow
+        max_green_time_per_lane = self.max_time
+        green_times = [max_green_time_per_lane] * 4
+
+        # Calculate total: max green time per lane × 4 lanes + yellow times
+        total_green_cycle = sum(green_times)
+        total_yellow_time = 4 * self.YELLOW_LIGHT_TIME
+        total_cycle_time = total_green_cycle + total_yellow_time
+
+        self.logger.warning(
+            "⚠️ FALLBACK MODE ACTIVATED: Using offline/safe timing. "
+            f"All lanes get {max_green_time_per_lane}s green + "
+            f"{self.YELLOW_LIGHT_TIME}s yellow. "
+            f"Total cycle time: {total_cycle_time}s"
+        )
+
+        return green_times, total_cycle_time
+
+    async def calculate_green_times_with_fallback(
+        self,
+        lane_counts: List[int],
+        junction_id: int = None,
+        is_offline: bool = False
+    ) -> Tuple[List[int], int, bool]:
+        """
+        Calculate green times with automatic fallback to offline mode.
+
+        This method checks for connectivity/data availability and automatically
+        switches to safe offline timing if needed.
+
+        Args:
+            lane_counts (List[int]): Vehicle count [lane1, lane2, lane3, lane4]
+            junction_id (int, optional): Junction ID for logging
+            is_offline (bool): Flag to force offline mode (for testing/simulation)
+
+        Returns:
+            Tuple[List[int], int, bool]: (green_times, cycle_time, is_using_fallback)
+                                         Third element indicates if fallback was used
+        """
+        if is_offline or lane_counts is None or len(lane_counts) == 0:
+            green_times, cycle_time = self.get_fallback_times()
+            return green_times, cycle_time, True
+
+        try:
+            # Try to calculate with actual vehicle data
+            green_times, cycle_time = await self.calculate_green_times(
+                lane_counts, junction_id
+            )
+            self.logger.info(
+                f"✅ Online mode: Calculated adaptive timing "
+                f"for {lane_counts} vehicles"
+            )
+            return green_times, cycle_time, False
+
+        except Exception as e:
+            # If calculation fails, fall back to safe offline mode
+            self.logger.error(
+                f"❌ Error calculating green times: {str(e)}. "
+                f"Switching to fallback/offline mode."
+            )
+            green_times, cycle_time = self.get_fallback_times()
+            return green_times, cycle_time, True
+
+    def get_fallback_info(self) -> dict:
+        """
+        Get information about fallback/offline mode
+
+        Returns:
+            dict: Fallback mode configuration and behavior
+        """
+        fallback_green, fallback_cycle = self.get_fallback_times()
+        return {
+            "mode": "fallback_offline",
+            "description": "Safe offline mode for when internet/detection is unavailable",
+            "trigger_conditions": [
+                "Raspberry Pi internet connection lost",
+                "Vehicle detection system offline",
+                "Communication with backend server failed",
+                "Invalid or null vehicle count data"
+            ],
+            "green_times_per_lane": fallback_green,
+            "yellow_time_per_lane": self.YELLOW_LIGHT_TIME,
+            "total_cycle_time": fallback_cycle,
+            "behavior": "Equal distribution - all lanes get maximum safe green time",
+            "safety_level": "High - ensures safe traffic flow even without real-time data"
+        }
