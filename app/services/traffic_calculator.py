@@ -20,10 +20,11 @@ class TrafficCalculator:
     # Yellow light configuration (constant)
     YELLOW_LIGHT_TIME = 5  # Fixed 5 seconds per lane
 
-    def __init__(self, min_time: int = 15, max_time: int = 90, base_cycle_time: int = 120):
+    def __init__(self, min_time: int = 15, max_time: int = 90, base_cycle_time: int = 120, db_service=None):
         self.min_time = min_time
         self.max_time = max_time
         self.base_cycle_time = base_cycle_time
+        self.db_service = db_service
         self.logger = logging.getLogger(__name__)
 
     async def calculate_green_times(
