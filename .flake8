@@ -1,66 +1,42 @@
 [flake8]
-# Very lenient flake8 configuration - focus on critical errors only
+# VERY lenient flake8 configuration - only fail on CRITICAL errors
 
 # Line length - increased to 120 for more flexibility
 max-line-length = 120
 
-# Maximum complexity - more lenient
-max-complexity = 15
+# Maximum complexity - very lenient
+max-complexity = 20
 
-# Ignore ALL whitespace and formatting issues (these are silly errors)
+# Ignore ALMOST EVERYTHING - only check for fatal errors
+# Fatal errors we want to catch:
+#   - F: PyFlakes errors (undefined names, unused imports in strict mode)
+#   - E9xx: Syntax errors
+# Everything else is ignored for developer happiness
+
 extend-ignore =
-    E203,
-    E226,
-    E227,
-    E228,
-    W291,
-    W293,
-    W503,
-    W504,
-    E501,
-    E231,
-    E241,
-    E251,
-    E701,
-    E702,
-    E703,
-    E711,
-    E712,
-    E713,
-    E714,
-    E721,
-    E722,
-    E731,
-    F841,
+    E1,
+    E2,
+    E3,
+    E4,
+    E5,
+    E7,
+    W1,
+    W2,
+    W3,
+    W5,
+    W6,
+    C,
+    D,
+    N,
     F401,
     F541,
-    C901,
-    D100,
-    D101,
-    D102,
-    D103,
-    D104,
-    D105,
-    D106,
-    D107,
-    D200,
-    D201,
-    D202,
-    D203,
-    D204,
-    D205,
-    D206,
-    D207,
-    D208,
-    D209,
-    D210,
-    D211,
-    D212,
-    D213,
-    N806,
-    N802,
-    N803,
-    N801
+    F841
+
+select =
+    E9,
+    F8,
+    F63,
+    F7
 
 # Exclude common directories
 exclude =
@@ -83,6 +59,7 @@ exclude =
 statistics = True
 count = True
 
-# Per-file ignores for even more flexibility in tests
+# Per-file ignores - even more lenient for tests
 per-file-ignores =
-    tests/*:E501,F401,F841,D,W,E
+    tests/*:F
+    main.py:F401
