@@ -10,6 +10,9 @@ import asyncio
 import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
+from mqtt_handler import mqtt
+
+
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,12 +34,14 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+mqtt.init_app(app)
+
 # CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # React development
-        "http://localhost:8000",  # Local testing
+        "http://localhost:8001",  # Local testing
         "https://your-frontend-domain.com",  # Production frontend
         # Add your Render URL here once deployed
     ],
@@ -57,6 +62,7 @@ async def startup_event():
     logger.info("🚀 Starting FlexTraff ATCS API...")
 
     try:
+        # Initialize database and calculator
         db_service = DatabaseService()
         traffic_calculator = TrafficCalculator(db_service=db_service)
 
@@ -70,6 +76,23 @@ async def startup_event():
     except Exception as e:
         logger.error(f"❌ Startup failed: {str(e)}")
         raise
+
+    # Wait for MQTT to connect
+    await asyncio.sleep(2)
+    
+    # Ensure subscription is active
+    print("\n" + "=" * 60)
+    print("🔁 Ensuring MQTT subscription is active...")
+    print("=" * 60)
+    
+    try:
+        # Force re-subscribe to ensure we're listening
+        mqtt.client.subscribe("flextraff/car_counts", qos=1)
+        print("✅ MQTT subscription confirmed")
+        print("🎧 Ready to receive car count data from Raspberry Pi")
+        print("=" * 60 + "\n")
+    except Exception as e:
+        print(f"⚠️ MQTT subscription warning: {e}")
 
 
 # Dependency to get database service
@@ -432,4 +455,4 @@ async def general_exception_handler(request, exc):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
